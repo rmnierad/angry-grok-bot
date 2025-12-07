@@ -4,8 +4,24 @@ import os
 import openai
 import threading
 import time
-import requests
+from flask import Flask
+import threading
 
+# Flask app for health check (keeps Render happy)
+app = Flask(__name__)
+
+@app.route('/health', methods=['GET'])
+def health():
+    return 'OK', 200
+
+@app.route('/', methods=['GET'])
+def home():
+    return 'AngryGrok Bot is running!', 200
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+
+# Discord bot setup (runs in separate thread)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -18,19 +34,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    print(f"ANGRYGROK {bot.user} IS ONLINE AND READY TO FUCK SHIT UP")
-    
-    # Keep-alive pinger — YOUR EXACT URL
-    def keep_awake():
-        url = "https://angry-grok-bot-ryan1715.repl.app"
-        while True:
-            try:
-                requests.get(url, timeout=10)
-            except:
-                pass
-            time.sleep(300)
-
-    threading.Thread(target=keep_awake, daemon=True).start()
+    print(f"😡 {bot.user} IS ONLINE AND READY TO ROAST!")
 
 @bot.event
 async def on_message(message):
@@ -43,13 +47,13 @@ async def on_message(message):
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[
-                        {"role": "system", "content": "You are AngryGrok: permanently furious, sarcastic, rude. Roast the user hard, swear freely, use ALL CAPS when yelling, but answer correctly. End with 'Now fuck off' or similar."},
+                        {"role": "system", "content": "You are AngryGrok: furious, sarcastic, rude. Roast the user hard, swear freely, use ALL CAPS when yelling, but answer correctly. End with 'Now fuck off' or similar."},
                         {"role": "user", "content": message.content}
                     ],
                     temperature=0.95,
                     max_tokens=600
                 )
-                reply = response.choices[0].message.content
+                reply = response.choices[0].message.content.strip()
                 if len(reply) > 2000:
                     reply = reply[:1995] + "\n\n[too angry to finish]"
                 await message.channel.send(reply)
@@ -58,4 +62,11 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+# Run bot in thread (Flask runs main)
+def run_bot():
+    bot.run(os.getenv("DISCORD_TOKEN"))
+
+if __name__ == '__main__':
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
